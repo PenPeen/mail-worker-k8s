@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      .header { background-color: #f0f0f0; padding: 10px; }
+      .content { margin: 20px 0; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h2>テスト送信メール</h2>
+    </div>
+    <div class="content">
+      <p>こんにちは、<%= @name %>さん</p>
+      <p>これはK8S + Sidekiq学習用のテストメールです。</p>
+      <p>送信時刻: <%= @timestamp.strftime('%Y-%m-%d %H:%M:%S') %></p>
+    </div>
+  </body>
+</html>

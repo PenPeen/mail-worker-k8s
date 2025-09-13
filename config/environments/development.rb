@@ -73,4 +73,12 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # メール設定
+  config.action_mailer.delivery_method = :smtp
+  config.action_mailer.smtp_settings = {
+    address: ENV.fetch('SMTP_HOST', 'localhost'),
+    port: ENV.fetch('SMTP_PORT', 1025),
+    domain: 'localhost'
+  }
 end
