@@ -9,14 +9,15 @@ Argo CD、Sidekiq、Kubernetes（HPA）の学習を目的とした最小限の�
 - Argo CD: GUI/CLI操作、GitOps、ロールバック
 - Sidekiq: キュー管理、ジョブ再試行、管理画面操作
 - Kubernetes: HPA動作、Pod自動スケーリング
+- Unleash: フィーチャーフラグ管理、A/Bテスト、段階的リリース
 
 ## 2. システム構成
 
 ### アーキテクチャ
 ```
 [Rails Web] ←→ [Redis] ←→ [Sidekiq Worker]
-     ↓
-[MailCatcher]
+     ↓              ↓
+[MailCatcher]    [Unleash]
 ```
 
 ### 技術スタック
@@ -24,6 +25,7 @@ Argo CD、Sidekiq、Kubernetes（HPA）の学習を目的とした最小限の�
 - **Job Queue**: Sidekiq + Redis
 - **Database**: SQLite（簡素化）
 - **Mail**: MailCatcher（テスト用SMTP）
+- **Feature Flags**: Unleash
 - **Container**: Docker
 - **Orchestration**: Kubernetes
 - **CD**: Argo CD
@@ -43,10 +45,15 @@ Argo CD、Sidekiq、Kubernetes（HPA）の学習を目的とした最小限の�
    - 1000件/5000件/10000件送信ボタン
    - 意図的エラー発生機能
 
+4. **フィーチャーフラグ機能**
+   - Unleashによる機能ON/OFF切り替え
+   - A/Bテスト用の段階的機能リリース
+
 ### 3.2 学習用機能
 - Sidekiq管理画面アクセス（`/sidekiq`）
 - リアルタイム送信状況表示
 - CPU使用率表示（HPA学習用）
+- Unleash管理画面アクセス（フィーチャーフラグ管理）
 
 ## 4. データベース設計
 
@@ -84,6 +91,7 @@ gem 'redis'
 gem 'sqlite3'
 gem 'bootsnap'
 gem 'puma'
+gem 'unleash', '~> 4.0'
 ```
 
 ### 5.2 モデル
@@ -181,6 +189,16 @@ services:
     ports:
       - "1080:1080"
       - "1025:1025"
+
+  unleash:
+    image: unleashorg/unleash-server:latest
+    ports:
+      - "4242:4242"
+    environment:
+      - DATABASE_URL=sqlite:///unleash.db
+      - DATABASE_SSL=false
+    volumes:
+      - unleash_data:/data
 
   web:
     build: .
@@ -531,6 +549,7 @@ kubectl apply -f argocd/application.yaml
 - **Rails App**: http://localhost:3000
 - **Sidekiq**: http://localhost:3000/sidekiq
 - **MailCatcher**: http://localhost:1080
+- **Unleash**: http://localhost:4242
 - **Argo CD**: https://localhost:8080
 
 ## 11. トラブルシューティング
@@ -549,7 +568,25 @@ kubectl apply -f argocd/application.yaml
    - アプリケーション状況: `argocd app get mail-app`
    - ログ確認: `kubectl logs -n argocd deployment/argocd-application-controller`
 
-## 12. 拡張案
+## 12. Unleash学習シナリオ
+
+### 12.1 フィーチャーフラグ基本操作
+1. **管理画面アクセス**
+   ```bash
+   kubectl port-forward svc/unleash 4242:4242
+   # http://localhost:4242
+   ```
+
+2. **フラグ作成・管理**
+   - 新機能のON/OFF切り替え
+   - ユーザーセグメント別の段階的リリース
+   - A/Bテスト設定
+
+3. **Rails連携**
+   - フィーチャーフラグによる機能制御
+   - 動的な機能切り替え確認
+
+## 13. 拡張案
 
 学習が進んだ後の拡張機能：
 - PostgreSQL導入
