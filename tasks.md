@@ -8,13 +8,56 @@
 
 ## タスク一覧
 
-- T-01: Rails基本アプリケーション作成
-  - 概要: Rails 7アプリケーションの基本構造とSidekiq設定を作成
-  - 理由: 学習用メール送信システムの基盤となるRailsアプリケーションが必要
-  - 受け入れ条件: Rails起動、Sidekiq管理画面アクセス、基本的なメール送信機能が動作
+- T-01: Docker環境とRails基本セットアップ
+  - 概要: Docker環境構築とRails 7アプリケーションの基本構造とSidekiq設定を作成
+  - 理由: コンテナ化により環境の一貫性を保ち、学習用メール送信システムの基盤を構築
+  - 受け入れ条件: docker-compose up で全サービス起動、Rails起動、Sidekiq管理画面アクセス
   - 依存関係: なし
-  - ブランチ: feature/rails-basic-setup
+  - ブランチ: feature/docker-rails-setup
   - 実装内容（詳細に、コピペするだけで作業が完了する粒度）
+    
+    - Dockerfileを新規作成:
+      ```dockerfile
+      FROM ruby:3.2-alpine
+
+      RUN apk add --no-cache build-base sqlite-dev tzdata
+      WORKDIR /app
+      COPY Gemfile Gemfile.lock ./
+      RUN bundle install
+      COPY . .
+      EXPOSE 3000
+      CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]
+      ```
+    
+    - docker-compose.ymlを新規作成:
+      ```yaml
+      version: '3.8'
+      services:
+        redis:
+          image: redis:7-alpine
+          ports: ["6379:6379"]
+        mailcatcher:
+          image: schickling/mailcatcher
+          ports: ["1080:1080", "1025:1025"]
+        web:
+          build: .
+          ports: ["3000:3000"]
+          environment:
+            - REDIS_URL=redis://redis:6379/0
+            - SMTP_HOST=mailcatcher
+            - SMTP_PORT=1025
+          depends_on: [redis, mailcatcher]
+          volumes: [".:/app"]
+        sidekiq:
+          build: .
+          command: bundle exec sidekiq
+          environment:
+            - REDIS_URL=redis://redis:6379/0
+            - SMTP_HOST=mailcatcher
+            - SMTP_PORT=1025
+          depends_on: [redis, mailcatcher]
+          volumes: [".:/app"]
+      ```
     
     - Gemfileを新規作成:
       ```ruby
@@ -515,146 +558,11 @@
       </div>
       ```
 
-- T-05: Docker環境構築
-  - 概要: 開発用Docker環境とKubernetes用Dockerイメージを作成
-  - 理由: コンテナ化によりK8S環境での動作とローカル開発環境の統一が必要
-  - 受け入れ条件: docker-compose up で全サービス起動、Dockerイメージビルド成功
-  - 依存関係: T-04
-  - ブランチ: feature/docker-setup
-  - 実装内容（詳細に、コピペするだけで作業が完了する粒度）
-    
-    - Dockerfileを新規作成:
-      ```dockerfile
-      FROM ruby:3.2-alpine
-
-      # 必要なパッケージをインストール
-      RUN apk add --no-cache \
-          build-base \
-          sqlite-dev \
-          tzdata
-
-      WORKDIR /app
-
-      # Gemfileをコピーしてbundle install
-      COPY Gemfile Gemfile.lock ./
-      RUN bundle config set --local deployment 'true' && \
-          bundle config set --local without 'development test' && \
-          bundle install
-
-      # アプリケーションコードをコピー
-      COPY . .
-
-      # データベース初期化スクリプト
-      RUN bundle exec rails db:create db:migrate || true
-
-      EXPOSE 3000
-
-      CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]
-      ```
-    
-    - docker-compose.ymlを新規作成:
-      ```yaml
-      version: '3.8'
-      services:
-        redis:
-          image: redis:7-alpine
-          ports:
-            - "6379:6379"
-          volumes:
-            - redis_data:/data
-
-        mailcatcher:
-          image: schickling/mailcatcher
-          ports:
-            - "1080:1080"  # Web UI
-            - "1025:1025"  # SMTP
-
-        web:
-          build: .
-          ports:
-            - "3000:3000"
-          environment:
-            - REDIS_URL=redis://redis:6379/0
-            - SMTP_HOST=mailcatcher
-            - SMTP_PORT=1025
-            - RAILS_ENV=development
-          depends_on:
-            - redis
-            - mailcatcher
-          volumes:
-            - .:/app
-            - bundle_cache:/usr/local/bundle
-
-        sidekiq:
-          build: .
-          command: bundle exec sidekiq
-          environment:
-            - REDIS_URL=redis://redis:6379/0
-            - SMTP_HOST=mailcatcher
-            - SMTP_PORT=1025
-            - RAILS_ENV=development
-          depends_on:
-            - redis
-            - mailcatcher
-          volumes:
-            - .:/app
-            - bundle_cache:/usr/local/bundle
-
-      volumes:
-        redis_data:
-        bundle_cache:
-      ```
-    
-    - .dockerignoreを新規作成:
-      ```
-      .git
-      .gitignore
-      README.md
-      Dockerfile
-      docker-compose.yml
-      .dockerignore
-      log/*
-      tmp/*
-      .bundle
-      vendor/bundle
-      node_modules
-      ```
-    
-    - db/seeds.rbを新規作成:
-      ```ruby
-      # サンプルデータ作成
-      puts "Creating sample email addresses..."
-
-      sample_emails = [
-        { name: "田中太郎", email: "tanaka@example.com" },
-        { name: "佐藤花子", email: "sato@example.com" },
-        { name: "鈴木一郎", email: "suzuki@example.com" },
-        { name: "高橋美咲", email: "takahashi@example.com" },
-        { name: "伊藤健太", email: "ito@example.com" }
-      ]
-
-      # 大量データ生成（負荷テスト用）
-      1000.times do |i|
-        sample_emails << {
-          name: "テストユーザー#{i + 1}",
-          email: "test#{i + 1}@example.com"
-        }
-      end
-
-      sample_emails.each do |email_data|
-        Email.find_or_create_by(email: email_data[:email]) do |email|
-          email.name = email_data[:name]
-        end
-      end
-
-      puts "Created #{Email.count} email addresses"
-      ```
-
-- T-06: Kubernetes基盤構築
+- T-05: Kubernetes基盤構築
   - 概要: K8S用のDeployment、Service、HPA設定ファイルを作成
   - 理由: HPA学習とArgo CD連携のためのK8S環境が必要
   - 受け入れ条件: 全Podが正常起動、HPA設定適用、サービス間通信確認
-  - 依存関係: T-05
+  - 依存関係: T-04
   - ブランチ: feature/kubernetes-manifests
   - 実装内容（詳細に、コピペするだけで作業が完了する粒度）
     
@@ -901,12 +809,74 @@
               value: 50
               periodSeconds: 60
       ```
+              - name: REDIS_URL
+                value: "redis://redis:6379/0"
+              - name: SMTP_HOST
+                value: "mailcatcher"
+              - name: SMTP_PORT
+                value: "1025"
+              - name: RAILS_ENV
+                value: "production"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 1000m
+                  memory: 512Mi
+              livenessProbe:
+                exec:
+                  command:
+                  - pgrep
+                  - -f
+                  - sidekiq
+                initialDelaySeconds: 30
+                periodSeconds: 30
+      ```
+    
+    - k8s/base/hpa.yamlを新規作成:
+      ```yaml
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: mail-sidekiq-hpa
+      spec:
+        scaleTargetRef:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: mail-sidekiq
+        minReplicas: 1
+        maxReplicas: 10
+        metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 70
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 60
+            policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+            - type: Pods
+              value: 2
+              periodSeconds: 60
+          scaleDown:
+            stabilizationWindowSeconds: 300
+            policies:
+            - type: Percent
+              value: 50
+              periodSeconds: 60
+      ```
 
-- T-07: Argo CD設定とGitOps環境構築
+- T-06: Argo CD設定とGitOps環境構築
   - 概要: Argo CDのApplication定義とGitOps環境を構築
   - 理由: Argo CD GUI/CLI学習とGitOpsワークフローの実践が必要
   - 受け入れ条件: Argo CDでアプリケーション同期成功、GUI/CLI操作確認、ロールバック動作確認
-  - 依存関係: T-06
+  - 依存関係: T-05
   - ブランチ: feature/argocd-setup
   - 実装内容（詳細に、コピペするだけで作業が完了する粒度）
     
@@ -1104,11 +1074,11 @@
       end
       ```
 
-- T-08: Unleashフィーチャーフラグ統合
+- T-07: Unleashフィーチャーフラグ統合
   - 概要: UnleashフィーチャーフラグシステムとRailsアプリケーションの連携を実装
   - 理由: フィーチャーフラグによる機能制御とA/Bテストの学習が必要
   - 受け入れ条件: Unleash管理画面アクセス、フラグ作成・切り替え、Railsアプリでのフラグ参照動作確認
-  - 依存関係: T-07
+  - 依存関係: T-06
   - ブランチ: feature/unleash-integration
   - 実装内容（詳細に、コピペするだけで作業が完了する粒度）
     
