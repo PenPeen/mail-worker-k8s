@@ -195,16 +195,3 @@ mail-worker-k8s/
 ## 📖 設計詳細
 
 システムの詳細設計は [DESIGN.md](DESIGN.md) を参照してください。
-
-## 🚀 拡張案
-
-学習が進んだ後の拡張機能：
-- PostgreSQL導入
-- 複数環境（dev/staging/prod）
-- Prometheus監視
-- Grafana ダッシュボード
-- Helm Chart化
-
----
-
-このプロジェクトを通じて、現代的なクラウドネイティブアプリケーションの開発・運用に必要な技術を実践的に学習できます。
