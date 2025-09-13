@@ -1,0 +1,114 @@
+<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+  <!-- 左側: メール管理 -->
+  <div style="flex: 1; min-width: 300px;">
+    <h2>メールアドレス管理</h2>
+    
+    <!-- 新規追加フォーム -->
+    <%= form_with model: Email.new, url: emails_path, local: true do |f| %>
+      <div class="form-group">
+        <%= f.text_field :name, placeholder: "名前", class: "form-control" %>
+        <%= f.email_field :email, placeholder: "メールアドレス", class: "form-control" %>
+        <%= f.submit "追加", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+    
+    <!-- CSV一括登録 -->
+    <%= form_with url: import_csv_emails_path, multipart: true, local: true do |f| %>
+      <div class="form-group">
+        <%= f.file_field :csv_file, accept: ".csv", class: "form-control" %>
+        <%= f.submit "CSV一括登録", class: "btn btn-success" %>
+      </div>
+    <% end %>
+    
+    <p>登録済み: <strong><%= @total_emails %>件</strong></p>
+    
+    <!-- メール一覧 -->
+    <table class="table">
+      <thead>
+        <tr>
+          <th>名前</th>
+          <th>メールアドレス</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @emails.each do |email| %>
+          <tr>
+            <td><%= email.name %></td>
+            <td><%= email.email %></td>
+            <td>
+              <%= link_to "削除", email_path(email), 
+                  class: "btn btn-danger", 
+                  data: { method: :delete, confirm: "削除しますか？" } %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- 右側: バルク送信 -->
+  <div style="flex: 1; min-width: 300px;">
+    <h2>バルク送信テスト</h2>
+    
+    <!-- 負荷テストボタン -->
+    <div class="form-group">
+      <h3>Sidekiq学習用</h3>
+      <%= link_to "1,000件送信", bulk_send_emails_path(count: 1000), 
+          class: "btn btn-primary", data: { method: :post } %>
+      <%= link_to "5,000件送信", bulk_send_emails_path(count: 5000), 
+          class: "btn btn-warning", data: { method: :post } %>
+      <%= link_to "10,000件送信", bulk_send_emails_path(count: 10000), 
+          class: "btn btn-danger", data: { method: :post } %>
+    </div>
+    
+    <div class="form-group">
+      <h3>エラーシミュレーション</h3>
+      <%= link_to "1,000件送信（エラー30%）", bulk_send_emails_path(count: 1000, simulate_error: true), 
+          class: "btn btn-warning", data: { method: :post } %>
+    </div>
+    
+    <!-- 管理画面リンク -->
+    <div class="form-group">
+      <h3>管理画面</h3>
+      <%= link_to "Sidekiq管理画面", "/sidekiq", target: "_blank", class: "btn btn-success" %>
+    </div>
+    
+    <!-- 送信履歴 -->
+    <h3>送信履歴</h3>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>作成日時</th>
+          <th>総数</th>
+          <th>成功</th>
+          <th>失敗</th>
+          <th>進捗</th>
+          <th>状態</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @mail_jobs.each do |job| %>
+          <tr>
+            <td><%= job.created_at.strftime('%m/%d %H:%M') %></td>
+            <td><%= job.total_count %></td>
+            <td><%= job.sent_count %></td>
+            <td><%= job.failed_count %></td>
+            <td>
+              <div class="progress" role="progressbar" aria-valuenow="<%= job.progress_percentage %>" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar" style="width: <%= job.progress_percentage %>%">
+                  <%= job.progress_percentage %>%
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="btn btn-<%= job.completed? ? 'success' : job.failed? ? 'danger' : 'warning' %>">
+                <%= job.status.humanize %>
+              </span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
