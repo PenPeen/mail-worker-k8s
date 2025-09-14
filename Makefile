@@ -26,10 +26,10 @@ setup: ## Setup minikube cluster and Argo CD for GitOps learning
 	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 	kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
+	@echo "=== パスワードを 'password' に変更中 ==="
+	kubectl -n argocd patch secret argocd-secret -p '{"stringData": {"admin.password": "$$2a$$10$$rRyBsGSHK6.uc8fntPwVeOI92.e0CzKYQeQ3/lHbYMjHYhfHvVe3e", "admin.passwordMtime": "'$$(date +%FT%T%Z)'"}}'
 	@echo "Username: admin"
-	@echo -n "Password: "
-	@kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-	@echo ""
+	@echo "Password: password"
 	@echo "GUI: kubectl port-forward svc/argocd-server -n argocd 8080:443"
 
 setup-repo: ## Setup private repository credentials for Argo CD
