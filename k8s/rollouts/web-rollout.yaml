@@ -1,0 +1,71 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: mail-web-rollout
+  labels:
+    app: mail-web
+spec:
+  replicas: 3
+  strategy:
+    canary:
+      steps:
+      - setWeight: 20
+      - pause: {duration: 1m}
+      - setWeight: 50
+      - pause: {duration: 1m}
+      - setWeight: 80
+      - pause: {duration: 1m}
+      canaryService: mail-web-canary
+      stableService: mail-web-stable
+      trafficRouting:
+        nginx:
+          stableIngress: mail-web-ingress
+      analysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: mail-web-canary
+  selector:
+    matchLabels:
+      app: mail-web
+  template:
+    metadata:
+      labels:
+        app: mail-web
+    spec:
+      containers:
+      - name: web
+        image: mail-app:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: REDIS_URL
+          value: "redis://redis:6379/0"
+        - name: SMTP_HOST
+          value: "mailcatcher"
+        - name: SMTP_PORT
+          value: "1025"
+        - name: RAILS_ENV
+          value: "production"
+        - name: DEPLOYMENT_VERSION
+          value: "v1.0.0"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
