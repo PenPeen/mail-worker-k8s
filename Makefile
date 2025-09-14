@@ -64,36 +64,30 @@ register-app: ## Register mail-app to Argo CD for GitOps deployment
 	kubectl apply -f argocd/application.yaml
 	@echo "=== アプリケーション登録完了 ==="
 
-start: ## Start development environment with port forwarding
-	## 目的: 開発環境の一括起動とポートフォワード設定
+start: ## Start GitOps development environment
+	## 目的: GitOpsワークフローでの開発環境起動
 	## 実行内容:
 	##   1. minikubeクラスター確認・起動
-	##   2. アプリケーションイメージビルド・デプロイ
-	##   3. データベースマイグレーション実行
-	##   4. ポートフォワード設定（8000:web, 8242:unleash, 8080:mailcatcher）
+	##   2. アプリケーションイメージビルド
+	##   3. Argo CDで手動同期待機
+	##   4. ポートフォワード設定
 	@echo "=== 開発環境起動開始 ==="
 	@if ! minikube status >/dev/null 2>&1; then \
 		minikube start; \
 	fi
 	@kubectl config use-context minikube
-	@echo "=== アプリケーションビルド・デプロイ ==="
+	@echo "=== アプリケーションビルド ==="
 	eval $$(minikube docker-env) && docker build -t mail-app:latest .
-	kubectl create namespace mail-app --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -f k8s/base/ -n mail-app
-	@echo "=== Pod起動待機 ==="
-	kubectl wait --for=condition=ready pod -l app=mail-web -n mail-app --timeout=120s
 	@echo "=== ポートフォワード設定 ==="
 	@pkill -f "kubectl port-forward" || true
 	kubectl port-forward svc/mail-web -n mail-app 8000:80 > /dev/null 2>&1 &
 	kubectl port-forward svc/unleash -n mail-app 8242:4242 > /dev/null 2>&1 &
 	kubectl port-forward svc/mailcatcher -n mail-app 8080:1080 > /dev/null 2>&1 &
 	kubectl port-forward svc/argocd-server -n argocd 8443:443 > /dev/null 2>&1 &
-	@echo "=== 開発環境起動完了 ==="
 	@echo "Rails: http://localhost:8000"
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
 	@echo "Unleash: http://localhost:8242 (admin/password)"
 	@echo "MailCatcher: http://localhost:8080"
-	@echo "Argo CD: https://localhost:8443 (admin/password)"
 
 stop: ## Stop port forwarding processes
 	@echo "=== ポートフォワード停止 ==="

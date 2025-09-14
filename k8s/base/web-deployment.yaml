@@ -18,7 +18,7 @@ spec:
       - name: db-migrate
         image: mail-app:latest
         imagePullPolicy: Never
-        command: ["bundle", "exec", "rails", "db:migrate"]
+        command: ["bundle", "exec", "rails", "db:create", "db:migrate"]
         env:
         - name: REDIS_URL
           value: "redis://redis:6379/0"
@@ -32,7 +32,7 @@ spec:
           value: "$(openssl rand -hex 64)"
         volumeMounts:
         - name: sqlite-storage
-          mountPath: /app/db
+          mountPath: /app/storage
       containers:
       - name: web
         image: mail-app:latest
@@ -54,7 +54,7 @@ spec:
           value: "$(openssl rand -hex 64)"
         volumeMounts:
         - name: sqlite-storage
-          mountPath: /app/db
+          mountPath: /app/storage
         resources:
           requests:
             cpu: 100m
