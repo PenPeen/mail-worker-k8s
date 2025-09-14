@@ -1240,3 +1240,365 @@
           echo "  argocd  - Argo CD GUI/CLI操作学習"
           echo "  unleash - Unleashフィーチャーフラグ学習"
       ```
+
+- T-08: Argo Rollouts統合
+  - 概要: Argo Rolloutsによるカナリアデプロイメントとブルー/グリーンデプロイメント戦略を実装
+  - 理由: 高度なデプロイメント戦略とプログレッシブデリバリーの学習が必要
+  - 受け入れ条件: Rollout作成・実行、カナリア段階的デプロイ、自動ロールバック動作確認
+  - 依存関係: T-07
+  - ブランチ: feature/argo-rollouts
+  - 実装内容（詳細に、コピペするだけで作業が完了する粒度）
+    
+    - k8s/rollouts/web-rollout.yamlを新規作成:
+      ```yaml
+      apiVersion: argoproj.io/v1alpha1
+      kind: Rollout
+      metadata:
+        name: mail-web-rollout
+        labels:
+          app: mail-web
+      spec:
+        replicas: 3
+        strategy:
+          canary:
+            steps:
+            - setWeight: 20
+            - pause: {duration: 30s}
+            - setWeight: 50
+            - pause: {duration: 30s}
+            - setWeight: 80
+            - pause: {duration: 30s}
+            canaryService: mail-web-canary
+            stableService: mail-web-stable
+            trafficRouting:
+              nginx:
+                stableIngress: mail-web-ingress
+            analysis:
+              templates:
+              - templateName: success-rate
+              args:
+              - name: service-name
+                value: mail-web-canary
+        selector:
+          matchLabels:
+            app: mail-web
+        template:
+          metadata:
+            labels:
+              app: mail-web
+          spec:
+            containers:
+            - name: web
+              image: mail-app:latest
+              ports:
+              - containerPort: 3000
+              env:
+              - name: REDIS_URL
+                value: "redis://redis:6379/0"
+              - name: SMTP_HOST
+                value: "mailcatcher"
+              - name: SMTP_PORT
+                value: "1025"
+              - name: RAILS_ENV
+                value: "production"
+              - name: DEPLOYMENT_VERSION
+                value: "v1.0.0"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: 3000
+                initialDelaySeconds: 10
+                periodSeconds: 5
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 3000
+                initialDelaySeconds: 30
+                periodSeconds: 10
+      ```
+    
+    - k8s/rollouts/services.yamlを新規作成:
+      ```yaml
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: mail-web-stable
+      spec:
+        selector:
+          app: mail-web
+        ports:
+        - port: 80
+          targetPort: 3000
+        type: ClusterIP
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: mail-web-canary
+      spec:
+        selector:
+          app: mail-web
+        ports:
+        - port: 80
+          targetPort: 3000
+        type: ClusterIP
+      ---
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: mail-web-ingress
+        annotations:
+          nginx.ingress.kubernetes.io/rewrite-target: /
+      spec:
+        rules:
+        - host: mail-app.local
+          http:
+            paths:
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                  name: mail-web-stable
+                  port:
+                    number: 80
+      ```
+    
+    - k8s/rollouts/analysis-template.yamlを新規作成:
+      ```yaml
+      apiVersion: argoproj.io/v1alpha1
+      kind: AnalysisTemplate
+      metadata:
+        name: success-rate
+      spec:
+        args:
+        - name: service-name
+        metrics:
+        - name: success-rate
+          interval: 30s
+          count: 3
+          successCondition: result[0] >= 0.95
+          provider:
+            prometheus:
+              address: http://prometheus:9090
+              query: |
+                sum(rate(http_requests_total{service="{{args.service-name}}",status!~"5.."}[2m])) /
+                sum(rate(http_requests_total{service="{{args.service-name}}"}[2m]))
+        - name: avg-response-time
+          interval: 30s
+          count: 3
+          successCondition: result[0] < 0.5
+          provider:
+            prometheus:
+              address: http://prometheus:9090
+              query: |
+                histogram_quantile(0.95,
+                  sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}"}[2m])) by (le)
+                )
+      ```
+    
+    - app/controllers/application_controller.rbにヘルスチェック追加:
+      ```ruby
+      class ApplicationController < ActionController::Base
+        def health
+          render json: {
+            status: 'ok',
+            version: ENV.fetch('DEPLOYMENT_VERSION', 'unknown'),
+            timestamp: Time.current.iso8601,
+            checks: {
+              database: database_check,
+              redis: redis_check
+            }
+          }
+        end
+
+        private
+
+        def database_check
+          ActiveRecord::Base.connection.execute('SELECT 1')
+          'ok'
+        rescue => e
+          'error'
+        end
+
+        def redis_check
+          Sidekiq.redis { |conn| conn.ping }
+          'ok'
+        rescue => e
+          'error'
+        end
+      end
+      ```
+    
+    - config/routes.rbにヘルスチェックルート追加:
+      ```ruby
+      Rails.application.routes.draw do
+        require 'sidekiq/web'
+        mount Sidekiq::Web => '/sidekiq'
+        
+        get '/health', to: 'application#health'
+        
+        root 'emails#index'
+        resources :emails, only: [:index, :create, :destroy] do
+          collection do
+            post :bulk_send
+            post :import_csv
+          end
+        end
+      end
+      ```
+    
+    - scripts/setup-rollouts.shを新規作成:
+      ```bash
+      #!/bin/bash
+      set -e
+
+      echo "=== Argo Rollouts セットアップ開始 ==="
+
+      # Argo Rollouts namespace作成
+      kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
+
+      # Argo Rollouts インストール
+      kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+
+      # Argo Rollouts Controllerの起動待機
+      echo "Argo Rollouts Controllerの起動を待機中..."
+      kubectl wait --for=condition=available --timeout=300s deployment/argo-rollouts-controller -n argo-rollouts
+
+      # kubectl plugin インストール確認
+      if ! kubectl argo rollouts version &> /dev/null; then
+          echo "=== Argo Rollouts kubectl plugin インストール ==="
+          curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          chmod +x ./kubectl-argo-rollouts-linux-amd64
+          sudo mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+          echo "kubectl plugin インストール完了"
+      fi
+
+      echo "=== Rollouts Dashboard セットアップ ==="
+      echo "Dashboard起動: kubectl argo rollouts dashboard"
+      echo "URL: http://localhost:3100"
+      echo ""
+
+      echo "=== セットアップ完了 ==="
+      ```
+    
+    - scripts/deploy-rollout.shを新規作成:
+      ```bash
+      #!/bin/bash
+      set -e
+
+      echo "=== Rollout デプロイ開始 ==="
+
+      # 既存のDeploymentを削除（Rolloutと競合するため）
+      kubectl delete deployment mail-web -n mail-app --ignore-not-found=true
+
+      # Rollout関連リソースをデプロイ
+      echo "Rolloutリソースを作成中..."
+      kubectl apply -f k8s/rollouts/ -n mail-app
+
+      # Rollout状況確認
+      echo "=== Rollout状況確認 ==="
+      kubectl argo rollouts get rollout mail-web-rollout -n mail-app
+
+      echo ""
+      echo "=== 管理コマンド ==="
+      echo "状況確認: kubectl argo rollouts get rollout mail-web-rollout -n mail-app"
+      echo "手動進行: kubectl argo rollouts promote mail-web-rollout -n mail-app"
+      echo "ロールバック: kubectl argo rollouts undo mail-web-rollout -n mail-app"
+      echo "Dashboard: kubectl argo rollouts dashboard"
+      echo ""
+
+      echo "=== デプロイ完了 ==="
+      ```
+    
+    - scripts/rollout-scenarios.shを新規作成:
+      ```bash
+      #!/bin/bash
+
+      echo "=== Rollout学習シナリオ実行スクリプト ==="
+      echo ""
+
+      case "$1" in
+        "canary")
+          echo "=== カナリアデプロイ学習シナリオ ==="
+          echo "1. 新バージョンイメージ作成:"
+          echo "   docker build -t mail-app:v2.0.0 --build-arg VERSION=v2.0.0 ."
+          echo "   minikube image load mail-app:v2.0.0"
+          echo ""
+          echo "2. Rollout更新:"
+          echo "   kubectl argo rollouts set image mail-web-rollout web=mail-app:v2.0.0 -n mail-app"
+          echo ""
+          echo "3. 段階的デプロイ監視:"
+          echo "   kubectl argo rollouts get rollout mail-web-rollout -n mail-app --watch"
+          echo ""
+          echo "4. 手動進行（必要に応じて）:"
+          echo "   kubectl argo rollouts promote mail-web-rollout -n mail-app"
+          ;;
+        "bluegreen")
+          echo "=== ブルー/グリーンデプロイ学習シナリオ ==="
+          echo "1. ブルー/グリーン戦略に変更:"
+          echo "   # k8s/rollouts/web-rollout.yamlのstrategyをblueGreenに変更"
+          echo ""
+          echo "2. 新バージョンデプロイ:"
+          echo "   kubectl argo rollouts set image mail-web-rollout web=mail-app:v3.0.0 -n mail-app"
+          echo ""
+          echo "3. プレビュー確認後、本番切り替え:"
+          echo "   kubectl argo rollouts promote mail-web-rollout -n mail-app"
+          ;;
+        "rollback")
+          echo "=== ロールバック学習シナリオ ==="
+          echo "1. 現在のリビジョン確認:"
+          kubectl argo rollouts history rollout mail-web-rollout -n mail-app
+          echo ""
+          echo "2. 前バージョンにロールバック:"
+          echo "   kubectl argo rollouts undo mail-web-rollout -n mail-app"
+          echo ""
+          echo "3. 特定リビジョンにロールバック:"
+          echo "   kubectl argo rollouts undo mail-web-rollout --to-revision=1 -n mail-app"
+          ;;
+        "analysis")
+          echo "=== 自動分析学習シナリオ ==="
+          echo "1. Prometheus設定（メトリクス収集用）"
+          echo "2. AnalysisTemplateでメトリクス閾値設定"
+          echo "3. 自動ロールバック動作確認"
+          echo "4. 成功条件・失敗条件のテスト"
+          ;;
+        *)
+          echo "使用方法: $0 [canary|bluegreen|rollback|analysis]"
+          echo ""
+          echo "利用可能なシナリオ:"
+          echo "  canary    - カナリアデプロイメント学習"
+          echo "  bluegreen - ブルー/グリーンデプロイメント学習"
+          echo "  rollback  - ロールバック操作学習"
+          echo "  analysis  - 自動分析・ロールバック学習"
+          ;;
+      esac
+      ```
+    
+    - scripts/learning-scenarios.shにRolloutsシナリオを追加:
+      ```bash
+        "rollouts")
+          echo "=== Argo Rollouts学習シナリオ ==="
+          echo "1. Dashboard起動: kubectl argo rollouts dashboard"
+          echo "2. http://localhost:3100 でRollouts管理画面確認"
+          echo "3. カナリアデプロイ実行: ./scripts/rollout-scenarios.sh canary"
+          echo "4. ロールバック操作: ./scripts/rollout-scenarios.sh rollback"
+          echo "5. 詳細シナリオ: ./scripts/rollout-scenarios.sh [canary|bluegreen|rollback|analysis]"
+          ;;
+      ```
+      
+      使用方法に追加:
+      ```bash
+          echo "利用可能なシナリオ:"
+          echo "  sidekiq  - Sidekiqキュー管理学習"
+          echo "  hpa      - HPA自動スケーリング学習"
+          echo "  argocd   - Argo CD GUI/CLI操作学習"
+          echo "  unleash  - Unleashフィーチャーフラグ学習"
+          echo "  rollouts - Argo Rolloutsデプロイ戦略学習"
+      ```
