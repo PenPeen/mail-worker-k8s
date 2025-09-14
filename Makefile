@@ -2,7 +2,7 @@
 ## 目的: Argo CD GUI/CLI学習とGitOpsワークフローの実践
 ## 前提: minikubeがインストール済み、kubectlが利用可能
 
-.PHONY: setup setup-repo register-app clean help
+.PHONY: setup setup-repo sync register-app clean help
 
 help: ## Show help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -40,6 +40,12 @@ setup-repo: ## Setup private repository credentials for Argo CD
 	GITHUB_USERNAME=$$GITHUB_USERNAME GITHUB_PAT=$$GITHUB_PAT envsubst < argocd/repo-secret.yaml | kubectl apply -f -
 	@kubectl apply -f argocd/application.yaml
 	@echo "リポジトリ認証情報が設定されました"
+
+sync: ## Manually sync Argo CD application
+	@echo "=== 手動同期実行 ==="
+	kubectl create namespace mail-app --dry-run=client -o yaml | kubectl apply -f -
+	kubectl patch application mail-app -n argocd --type merge -p '{"operation":{"sync":{"syncStrategy":{"apply":{"force":true}}}}}'
+	@echo "同期が開始されました"
 
 register-app: ## Register mail-app to Argo CD for GitOps deployment
 	## 目的: GitOpsワークフローの学習のためにArgo CDにアプリケーションを登録
