@@ -17,6 +17,7 @@ spec:
       containers:
       - name: sidekiq
         image: mail-app:latest
+        imagePullPolicy: Never
         command: ["bundle", "exec", "sidekiq"]
         env:
         - name: REDIS_URL
@@ -27,6 +28,8 @@ spec:
           value: "1025"
         - name: RAILS_ENV
           value: "production"
+        - name: SECRET_KEY_BASE
+          value: "$(openssl rand -hex 64)"
         resources:
           requests:
             cpu: 100m

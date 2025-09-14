@@ -17,6 +17,7 @@ spec:
       containers:
       - name: web
         image: mail-app:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 3000
         env:
@@ -30,6 +31,8 @@ spec:
           value: "production"
         - name: APP_VERSION
           value: "v1.0.1"
+        - name: SECRET_KEY_BASE
+          value: "$(openssl rand -hex 64)"
         resources:
           requests:
             cpu: 100m
@@ -60,4 +63,4 @@ spec:
   ports:
   - port: 80
     targetPort: 3000
-  type: LoadBalancer
+  type: NodePort

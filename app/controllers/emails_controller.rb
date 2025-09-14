@@ -24,26 +24,37 @@ class EmailsController < ApplicationController
   end
 
   def bulk_send
+    # フィーチャーフラグチェック
+    unless FeatureFlagService.enabled?('bulk_send_feature')
+      redirect_to emails_path, alert: 'バルク送信機能は現在無効です'
+      return
+    end
+    
     count = params[:count].to_i
     simulate_error = params[:simulate_error] == 'true'
-
+    
+    # A/Bテスト用のバリアント取得
+    variant = FeatureFlagService.variant('send_strategy')
+    use_priority_queue = variant == 'priority'
+    
     if Email.count < count
       redirect_to emails_path, alert: "送信対象が不足しています（現在#{Email.count}件）"
       return
     end
-
+    
     mail_job = MailJob.create!(
       total_count: count,
       status: :processing
     )
-
-    # ランダムにメールアドレスを選択してジョブ作成
-    email_ids = Email.order('RANDOM()').limit(count).pluck(:id)
-    email_ids.each do |email_id|
-      MailSenderJob.perform_async(email_id, mail_job.id, simulate_error)
+    
+    # フィーチャーフラグによるキュー切り替え
+    queue_name = use_priority_queue ? 'high' : 'default'
+    
+    Email.order('RANDOM()').limit(count).each do |email|
+      MailSenderJob.set(queue: queue_name).perform_async(email.id, mail_job.id, simulate_error)
     end
-
-    redirect_to emails_path, notice: "#{count}件の送信ジョブを作成しました"
+    
+    redirect_to emails_path, notice: "#{count}件の送信ジョブを作成しました（キュー: #{queue_name}）"
   end
 
   def import_csv
