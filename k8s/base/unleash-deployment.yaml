@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: unleash
-        image: unleashorg/unleash-server:4.18.0
+        image: unleashorg/unleash-server:5.7.0
         ports:
         - containerPort: 4242
         env:
