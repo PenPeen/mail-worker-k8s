@@ -20,12 +20,6 @@ spec:
       trafficRouting:
         nginx:
           stableIngress: mail-web-ingress
-      analysis:
-        templates:
-        - templateName: success-rate
-        args:
-        - name: service-name
-          value: mail-web-canary
   selector:
     matchLabels:
       app: mail-web
@@ -37,6 +31,7 @@ spec:
       containers:
       - name: web
         image: mail-app:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 3000
         env:
@@ -49,7 +44,9 @@ spec:
         - name: RAILS_ENV
           value: "production"
         - name: DEPLOYMENT_VERSION
-          value: "v1.0.0"
+          value: "v1.1.0"
+        - name: SECRET_KEY_BASE
+          value: "dummy_secret_key_for_testing_only_not_for_production"
         resources:
           requests:
             cpu: 100m
