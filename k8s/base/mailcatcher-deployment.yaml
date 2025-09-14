@@ -42,4 +42,4 @@ spec:
   - name: smtp
     port: 1025
     targetPort: 1025
-  type: ClusterIP
+  type: LoadBalancer

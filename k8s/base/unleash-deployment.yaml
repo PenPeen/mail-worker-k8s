@@ -46,4 +46,4 @@ spec:
   ports:
   - port: 4242
     targetPort: 4242
-  type: ClusterIP
+  type: LoadBalancer
