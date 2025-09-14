@@ -14,6 +14,25 @@ spec:
       labels:
         app: mail-web
     spec:
+      initContainers:
+      - name: db-migrate
+        image: mail-app:latest
+        imagePullPolicy: Never
+        command: ["bundle", "exec", "rails", "db:migrate"]
+        env:
+        - name: REDIS_URL
+          value: "redis://redis:6379/0"
+        - name: SMTP_HOST
+          value: "mailcatcher"
+        - name: SMTP_PORT
+          value: "1025"
+        - name: RAILS_ENV
+          value: "production"
+        - name: SECRET_KEY_BASE
+          value: "$(openssl rand -hex 64)"
+        volumeMounts:
+        - name: sqlite-storage
+          mountPath: /app/db
       containers:
       - name: web
         image: mail-app:latest
@@ -33,6 +52,9 @@ spec:
           value: "v1.0.1"
         - name: SECRET_KEY_BASE
           value: "$(openssl rand -hex 64)"
+        volumeMounts:
+        - name: sqlite-storage
+          mountPath: /app/db
         resources:
           requests:
             cpu: 100m
@@ -52,6 +74,10 @@ spec:
             port: 3000
           initialDelaySeconds: 60
           periodSeconds: 30
+      volumes:
+      - name: sqlite-storage
+        persistentVolumeClaim:
+          claimName: sqlite-pvc
 ---
 apiVersion: v1
 kind: Service

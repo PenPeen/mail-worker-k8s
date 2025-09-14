@@ -30,7 +30,7 @@ setup: ## Setup minikube cluster and Argo CD for GitOps learning
 	kubectl -n argocd patch secret argocd-secret -p '{"stringData": {"admin.password": "$$2a$$10$$rRyBsGSHK6.uc8fntPwVeOI92.e0CzKYQeQ3/lHbYMjHYhfHvVe3e", "admin.passwordMtime": "'$$(date +%FT%T%Z)'"}}'
 	@echo "Username: admin"
 	@echo "Password: password"
-	@echo "GUI: kubectl port-forward svc/argocd-server -n argocd 8080:443"
+	@echo "GUI: kubectl port-forward svc/argocd-server -n argocd 8443:443"
 
 setup-repo: ## Setup private repository credentials for Argo CD
 	@echo "=== プライベートリポジトリ設定 ==="
@@ -82,18 +82,18 @@ start: ## Start development environment with port forwarding
 	kubectl apply -f k8s/base/ -n mail-app
 	@echo "=== Pod起動待機 ==="
 	kubectl wait --for=condition=ready pod -l app=mail-web -n mail-app --timeout=120s
-	@echo "=== データベースマイグレーション ==="
-	kubectl exec deployment/mail-web -n mail-app -- bundle exec rails db:migrate
 	@echo "=== ポートフォワード設定 ==="
 	@pkill -f "kubectl port-forward" || true
 	kubectl port-forward svc/mail-web -n mail-app 8000:80 > /dev/null 2>&1 &
 	kubectl port-forward svc/unleash -n mail-app 8242:4242 > /dev/null 2>&1 &
 	kubectl port-forward svc/mailcatcher -n mail-app 8080:1080 > /dev/null 2>&1 &
+	kubectl port-forward svc/argocd-server -n argocd 8443:443 > /dev/null 2>&1 &
 	@echo "=== 開発環境起動完了 ==="
 	@echo "Rails: http://localhost:8000"
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
 	@echo "Unleash: http://localhost:8242 (admin/password)"
 	@echo "MailCatcher: http://localhost:8080"
+	@echo "Argo CD: https://localhost:8443 (admin/password)"
 
 stop: ## Stop port forwarding processes
 	@echo "=== ポートフォワード停止 ==="
@@ -109,6 +109,7 @@ status: ## Show service status and URLs
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
 	@echo "Unleash: http://localhost:8242 (admin/password)"
 	@echo "MailCatcher: http://localhost:8080"
+	@echo "Argo CD: https://localhost:8443 (admin/password)"
 
 clean: ## Clean up Argo CD application and related resources
 	## 目的: テスト環境のクリーンアップ
