@@ -2,7 +2,7 @@
 ## 目的: Argo CD GUI/CLI学習とGitOpsワークフローの実践
 ## 前提: minikubeがインストール済み、kubectlが利用可能
 
-.PHONY: setup register-app clean help
+.PHONY: setup setup-repo register-app clean help
 
 help: ## Show help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -31,6 +31,15 @@ setup: ## Setup minikube cluster and Argo CD for GitOps learning
 	@kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 	@echo ""
 	@echo "GUI: kubectl port-forward svc/argocd-server -n argocd 8080:443"
+
+setup-repo: ## Setup private repository credentials for Argo CD
+	@echo "=== プライベートリポジトリ設定 ==="
+	@read -p "GitHubユーザー名: " GITHUB_USERNAME; \
+	read -s -p "GitHub PAT: " GITHUB_PAT; \
+	echo; \
+	GITHUB_USERNAME=$$GITHUB_USERNAME GITHUB_PAT=$$GITHUB_PAT envsubst < argocd/repo-secret.yaml | kubectl apply -f -
+	@kubectl apply -f argocd/application.yaml
+	@echo "リポジトリ認証情報が設定されました"
 
 register-app: ## Register mail-app to Argo CD for GitOps deployment
 	## 目的: GitOpsワークフローの学習のためにArgo CDにアプリケーションを登録
