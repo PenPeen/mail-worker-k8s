@@ -28,6 +28,10 @@ spec:
           value: "info"
         - name: INIT_ADMIN_API_TOKENS
           value: "*:*.unleash-insecure-admin-api-token"
+        - name: INIT_ADMIN_USERNAME
+          value: "admin"
+        - name: INIT_ADMIN_PASSWORD
+          value: "password"
         resources:
           requests:
             cpu: 100m

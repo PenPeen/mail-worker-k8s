@@ -92,7 +92,7 @@ start: ## Start development environment with port forwarding
 	@echo "=== 開発環境起動完了 ==="
 	@echo "Rails: http://localhost:8000"
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
-	@echo "Unleash: http://localhost:8242"
+	@echo "Unleash: http://localhost:8242 (admin/password)"
 	@echo "MailCatcher: http://localhost:8080"
 
 stop: ## Stop port forwarding processes
@@ -107,7 +107,7 @@ status: ## Show service status and URLs
 	@echo "=== アクセスURL ==="
 	@echo "Rails: http://localhost:8000"
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
-	@echo "Unleash: http://localhost:8242"
+	@echo "Unleash: http://localhost:8242 (admin/password)"
 	@echo "MailCatcher: http://localhost:8080"
 
 clean: ## Clean up Argo CD application and related resources
