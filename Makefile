@@ -80,10 +80,15 @@ start: ## Start GitOps development environment
 	eval $$(minikube docker-env) && docker build -t mail-app:latest .
 	@echo "=== ポートフォワード設定 ==="
 	@pkill -f "kubectl port-forward" || true
-	kubectl port-forward svc/mail-web -n mail-app 8000:80 > /dev/null 2>&1 &
-	kubectl port-forward svc/unleash -n mail-app 8242:4242 > /dev/null 2>&1 &
-	kubectl port-forward svc/mailcatcher -n mail-app 8080:1080 > /dev/null 2>&1 &
-	kubectl port-forward svc/argocd-server -n argocd 8443:443 > /dev/null 2>&1 &
+	@sleep 2
+	@echo "Starting port forwards..."
+	@kubectl port-forward svc/mail-web -n mail-app 8000:80 > /dev/null 2>&1 & echo "Mail-web port-forward started (PID: $$!)"
+	@kubectl port-forward svc/unleash -n mail-app 8242:4242 > /dev/null 2>&1 & echo "Unleash port-forward started (PID: $$!)"
+	@kubectl port-forward svc/mailcatcher -n mail-app 8080:1080 > /dev/null 2>&1 & echo "MailCatcher port-forward started (PID: $$!)"
+	@kubectl port-forward svc/argocd-server -n argocd 8443:443 > /dev/null 2>&1 & echo "Argo CD port-forward started (PID: $$!)"
+	@sleep 3
+	@echo "=== サービス確認 ==="
+	@ps aux | grep "kubectl port-forward" | grep -v grep || echo "Warning: Some port-forwards may not be running"
 	@echo "Rails: http://localhost:8000"
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
 	@echo "Unleash: http://localhost:8242 (admin/password)"
