@@ -27,7 +27,7 @@ spec:
         - name: SMTP_PORT
           value: "1025"
         - name: RAILS_ENV
-          value: "production"
+          value: "development"
         - name: SECRET_KEY_BASE
           value: "$(openssl rand -hex 64)"
         volumeMounts:
@@ -47,7 +47,7 @@ spec:
         - name: SMTP_PORT
           value: "1025"
         - name: RAILS_ENV
-          value: "production"
+          value: "development"
         - name: APP_VERSION
           value: "v1.0.1"
         - name: SECRET_KEY_BASE
