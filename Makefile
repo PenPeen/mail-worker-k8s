@@ -2,7 +2,7 @@
 ## 目的: Argo CD GUI/CLI学習とGitOpsワークフローの実践
 ## 前提: minikubeがインストール済み、kubectlが利用可能
 
-.PHONY: setup setup-repo sync register-app clean help start stop status
+.PHONY: setup setup-repo sync register-app clean help start stop restart status
 
 help: ## Show help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -98,6 +98,10 @@ stop: ## Stop port forwarding processes
 	@echo "=== ポートフォワード停止 ==="
 	@pkill -f "kubectl port-forward" || true
 	@echo "ポートフォワードを停止しました"
+
+restart: ## Restart development environment (stop + start)
+	@$(MAKE) stop
+	@$(MAKE) start
 
 status: ## Show service status and URLs
 	@echo "=== サービス状況 ==="
