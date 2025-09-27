@@ -91,7 +91,7 @@ start: ## Start GitOps development environment
 	@ps aux | grep "kubectl port-forward" | grep -v grep || echo "Warning: Some port-forwards may not be running"
 	@echo "Rails: http://localhost:8000"
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
-	@echo "Unleash: http://localhost:8242 (admin/password)"
+	@echo "Unleash: http://localhost:8242 (admin/unleash4all)"
 	@echo "MailCatcher: http://localhost:8080"
 
 stop: ## Stop port forwarding processes
@@ -106,7 +106,7 @@ status: ## Show service status and URLs
 	@echo "=== アクセスURL ==="
 	@echo "Rails: http://localhost:8000"
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
-	@echo "Unleash: http://localhost:8242 (admin/password)"
+	@echo "Unleash: http://localhost:8242 (admin/unleash4all)"
 	@echo "MailCatcher: http://localhost:8080"
 	@echo "Argo CD: https://localhost:8443 (admin/password)"
 
