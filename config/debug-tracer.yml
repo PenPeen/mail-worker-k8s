@@ -1,0 +1,8 @@
+enabled: true
+output:
+  target: stdout  # stdout or file
+  file_path: log/debug_trace.log
+display:
+  file_path: true
+  line_number: true
+  method_name: true
