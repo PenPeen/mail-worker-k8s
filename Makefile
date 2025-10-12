@@ -19,6 +19,7 @@ setup: ## Setup minikube cluster and Argo CD for GitOps learning
 	## 結果: Argo CD GUIに https://localhost:8080 でアクセス可能になる
 	@echo "=== minikube クラスター起動 ==="
 	@if ! minikube status >/dev/null 2>&1; then \
+		echo "minikubeを起動中..."; \
 		minikube start; \
 	fi
 	@kubectl config use-context minikube
@@ -56,7 +57,7 @@ register-app: ## Register mail-app to Argo CD for GitOps deployment
 	## 注意: 現在のapplication.yamlのrepoURLがプレースホルダーのため、Git同期は失敗する
 	## 結果: Argo CD GUIでmail-appアプリケーションが表示される（OutOfSync状態）
 	@echo "=== Argo CDアプリケーション登録開始 ==="
-	docker build -t mail-app:latest .
+	@eval $$(minikube docker-env) && docker build -t mail-app:latest .
 	@if command -v minikube >/dev/null 2>&1 && minikube status >/dev/null 2>&1; then \
 		echo "minikubeにイメージをロード中..."; \
 		minikube image load mail-app:latest; \
@@ -73,11 +74,12 @@ start: ## Start GitOps development environment
 	##   4. ポートフォワード設定
 	@echo "=== 開発環境起動開始 ==="
 	@if ! minikube status >/dev/null 2>&1; then \
+		echo "minikubeを起動中..."; \
 		minikube start; \
 	fi
 	@kubectl config use-context minikube
 	@echo "=== アプリケーションビルド ==="
-	eval $$(minikube docker-env) && docker build -t mail-app:latest .
+	@eval $$(minikube docker-env) && docker build -t mail-app:latest .
 	@echo "=== ポートフォワード設定 ==="
 	@pkill -f "kubectl port-forward" || true
 	@sleep 2
