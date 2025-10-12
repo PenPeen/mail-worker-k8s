@@ -73,7 +73,7 @@ start: ## Start GitOps development environment
 	##   3. Argo CDで手動同期待機
 	##   4. ポートフォワード設定
 	@echo "=== 開発環境起動開始 ==="
-	@if ! minikube status >/dev/null 2>&1; then \
+	@if ! minikube status 2>&1 | grep -q "Running"; then \
 		echo "minikubeを起動中..."; \
 		minikube start; \
 	fi
