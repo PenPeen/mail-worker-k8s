@@ -18,7 +18,7 @@ setup: ## Setup minikube cluster and Argo CD for GitOps learning
 	##   6. 初期管理者パスワードを取得・表示
 	## 結果: Argo CD GUIに https://localhost:8080 でアクセス可能になる
 	@echo "=== minikube クラスター起動 ==="
-	@if ! minikube status >/dev/null 2>&1; then \
+	@if ! minikube status 2>&1 | grep -q "Running"; then \
 		echo "minikubeを起動中..."; \
 		minikube start; \
 	fi
