@@ -1,24 +1,37 @@
 # README
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+## 概要
+Argo CDとGitOpsワークフローの学習環境（Rails + Sidekiq + Kubernetes）
 
-Things you may want to cover:
+## 前提条件
+- minikube
+- kubectl
 
-* Ruby version
+## 起動方法
 
-* System dependencies
+```bash
+# 1. Argo CD環境セットアップ
+make setup
 
-* Configuration
+# 2. アプリケーション登録
+make register-app
 
-* Database creation
+# 3. 開発環境起動（イメージビルド + ポートフォワード）
+make start
+```
 
-* Database initialization
+## アクセスURL
+- Rails: http://localhost:8000
+- Sidekiq: http://localhost:8000/sidekiq
+- Unleash: http://localhost:8242 (admin/unleash4all)
+- MailCatcher: http://localhost:8080
+- Argo CD: https://localhost:8443 (admin/password)
 
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+## その他のコマンド
+```bash
+make status   # サービス状況確認
+make stop     # ポートフォワード停止
+make restart  # 再起動
+make clean    # 環境クリーンアップ
+make help     # コマンド一覧表示
+```
