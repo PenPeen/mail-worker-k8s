@@ -2,6 +2,9 @@
 ## 目的: Argo CD GUI/CLI学習とGitOpsワークフローの実践
 ## 前提: minikubeがインストール済み、kubectlが利用可能
 
+# プロジェクト専用のminikubeプロファイル名
+MINIKUBE_PROFILE = mail-app
+
 .PHONY: setup setup-repo sync register-app clean help start stop restart status
 
 help: ## Show help
@@ -18,17 +21,20 @@ setup: ## Setup minikube cluster and Argo CD for GitOps learning
 	##   6. 初期管理者パスワードを取得・表示
 	## 結果: Argo CD GUIに https://localhost:8080 でアクセス可能になる
 	@echo "=== minikube クラスター起動 ==="
-	@if ! minikube status 2>&1 | grep -q "Running"; then \
+	@if ! minikube -p $(MINIKUBE_PROFILE) status 2>&1 | grep -q "Running"; then \
 		echo "minikubeを起動中..."; \
-		minikube start; \
+		minikube start -p $(MINIKUBE_PROFILE); \
 	fi
-	@kubectl config use-context minikube
+	@kubectl config use-context $(MINIKUBE_PROFILE)
 	@echo "=== Argo CD セットアップ開始 ==="
 	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 	kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
 	@echo "=== パスワードを 'password' に変更中 ==="
-	kubectl -n argocd patch secret argocd-secret -p '{"stringData": {"admin.password": "$$2a$$10$$rRyBsGSHK6.uc8fntPwVeOI92.e0CzKYQeQ3/lHbYMjHYhfHvVe3e", "admin.passwordMtime": "'$$(date +%FT%T%Z)'"}}'
+	kubectl -n argocd delete secret argocd-initial-admin-secret --ignore-not-found=true
+	kubectl -n argocd patch secret argocd-secret -p '{"stringData": {"admin.password": "$$2a$$10$$vFH0TVRnZ7UbM.ibdcruvOjlqE0YObaNZUAGi2bUfChddZtxUZwxS", "admin.passwordMtime": "'$$(date +%FT%T%Z)'"}}'
+	kubectl -n argocd rollout restart deployment argocd-server
+	kubectl -n argocd rollout status deployment argocd-server --timeout=120s
 	@echo "Username: admin"
 	@echo "Password: password"
 	@echo "GUI: kubectl port-forward svc/argocd-server -n argocd 8443:443"
@@ -57,10 +63,10 @@ register-app: ## Register mail-app to Argo CD for GitOps deployment
 	## 注意: 現在のapplication.yamlのrepoURLがプレースホルダーのため、Git同期は失敗する
 	## 結果: Argo CD GUIでmail-appアプリケーションが表示される（OutOfSync状態）
 	@echo "=== Argo CDアプリケーション登録開始 ==="
-	@eval $$(minikube docker-env) && docker build -t mail-app:latest .
-	@if command -v minikube >/dev/null 2>&1 && minikube status >/dev/null 2>&1; then \
+	@eval $$(minikube -p $(MINIKUBE_PROFILE) docker-env) && docker build -t mail-app:latest .
+	@if command -v minikube >/dev/null 2>&1 && minikube -p $(MINIKUBE_PROFILE) status >/dev/null 2>&1; then \
 		echo "minikubeにイメージをロード中..."; \
-		minikube image load mail-app:latest; \
+		minikube -p $(MINIKUBE_PROFILE) image load mail-app:latest; \
 	fi
 	kubectl apply -f argocd/application.yaml
 	@echo "=== アプリケーション登録完了 ==="
@@ -73,13 +79,13 @@ start: ## Start GitOps development environment
 	##   3. Argo CDで手動同期待機
 	##   4. ポートフォワード設定
 	@echo "=== 開発環境起動開始 ==="
-	@if ! minikube status 2>&1 | grep -q "Running"; then \
+	@if ! minikube -p $(MINIKUBE_PROFILE) status 2>&1 | grep -q "Running"; then \
 		echo "minikubeを起動中..."; \
-		minikube start; \
+		minikube start -p $(MINIKUBE_PROFILE); \
 	fi
-	@kubectl config use-context minikube
+	@kubectl config use-context $(MINIKUBE_PROFILE)
 	@echo "=== アプリケーションビルド ==="
-	@eval $$(minikube docker-env) && docker build -t mail-app:latest .
+	@eval $$(minikube -p $(MINIKUBE_PROFILE) docker-env) && docker build -t mail-app:latest .
 	@echo "=== ポートフォワード設定 ==="
 	@pkill -f "kubectl port-forward" || true
 	@sleep 2
@@ -95,6 +101,7 @@ start: ## Start GitOps development environment
 	@echo "Sidekiq: http://localhost:8000/sidekiq"
 	@echo "Unleash: http://localhost:8242 (admin/unleash4all)"
 	@echo "MailCatcher: http://localhost:8080"
+	@echo "Argo CD: https://localhost:8443 (admin/password)"
 
 stop: ## Stop port forwarding processes
 	@echo "=== ポートフォワード停止 ==="
