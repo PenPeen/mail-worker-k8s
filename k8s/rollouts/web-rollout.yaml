@@ -44,7 +44,7 @@ spec:
         - name: RAILS_ENV
           value: "production"
         - name: DEPLOYMENT_VERSION
-          value: "v1.1.0"
+          value: "v1.2.0"
         - name: SECRET_KEY_BASE
           value: "dummy_secret_key_for_testing_only_not_for_production"
         resources:
