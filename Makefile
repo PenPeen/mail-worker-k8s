@@ -38,6 +38,11 @@ setup: ## Setup minikube cluster and Argo CD for GitOps learning
 	@echo "Username: admin"
 	@echo "Password: password"
 	@echo "GUI: kubectl port-forward svc/argocd-server -n argocd 8443:443"
+	@echo "=== Argo Rollouts セットアップ開始 ==="
+	kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+	kubectl wait --for=condition=available --timeout=300s deployment/argo-rollouts -n argo-rollouts
+	@echo "=== Argo Rollouts セットアップ完了 ==="
 
 setup-repo: ## Setup private repository credentials for Argo CD
 	@echo "=== プライベートリポジトリ設定 ==="
