@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mail-sidekiq
+  labels:
+    app: mail-sidekiq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mail-sidekiq
+  template:
+    metadata:
+      labels:
+        app: mail-sidekiq
+    spec:
+      containers:
+      - name: sidekiq
+        image: mail-app:latest
+        imagePullPolicy: Never
+        command: ["bundle", "exec", "sidekiq"]
+        env:
+        - name: REDIS_URL
+          value: "redis://redis:6379/0"
+        - name: SMTP_HOST
+          value: "mailcatcher"
+        - name: SMTP_PORT
+          value: "1025"
+        - name: RAILS_ENV
+          value: "production"
+        - name: SECRET_KEY_BASE
+          value: "$(openssl rand -hex 64)"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 1000m
+            memory: 512Mi
+        livenessProbe:
+          exec:
+            command:
+            - pgrep
+            - -f
+            - sidekiq
+          initialDelaySeconds: 30
+          periodSeconds: 30

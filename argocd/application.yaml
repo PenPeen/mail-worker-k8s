@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/PenPeen/mail-worker-k8s
     targetRevision: HEAD
-    path: k8s/base
+    path: k8s/rollouts
   destination:
     server: https://kubernetes.default.svc
     namespace: mail-app

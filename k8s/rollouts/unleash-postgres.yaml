@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unleash-postgres
+  labels:
+    app: unleash-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: unleash-postgres
+  template:
+    metadata:
+      labels:
+        app: unleash-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:13
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: "unleash"
+        - name: POSTGRES_USER
+          value: "unleash"
+        - name: POSTGRES_PASSWORD
+          value: "password"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: unleash-postgres
+spec:
+  selector:
+    app: unleash-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+  type: ClusterIP
