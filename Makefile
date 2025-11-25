@@ -50,7 +50,7 @@ setup-repo: ## Setup private repository credentials for Argo CD
 	read -s -p "GitHub PAT: " GITHUB_PAT; \
 	echo; \
 	GITHUB_USERNAME=$$GITHUB_USERNAME GITHUB_PAT=$$GITHUB_PAT envsubst < argocd/repo-secret.yaml | kubectl apply -f -
-	@kubectl apply -f argocd/application.yaml
+	@kubectl apply -f argocd/applications/mail-app.yaml
 	@echo "リポジトリ認証情報が設定されました"
 
 sync: ## Manually sync Argo CD application
@@ -73,7 +73,7 @@ register-app: ## Register mail-app to Argo CD for GitOps deployment
 		echo "minikubeにイメージをロード中..."; \
 		minikube -p $(MINIKUBE_PROFILE) image load mail-app:latest; \
 	fi
-	kubectl apply -f argocd/application.yaml
+	kubectl apply -f argocd/applications/mail-app.yaml
 	@echo "=== アプリケーション登録完了 ==="
 
 start: ## Start GitOps development environment
